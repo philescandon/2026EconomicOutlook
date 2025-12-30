@@ -3,6 +3,11 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from data_manager import (
+    load_gdp_data, load_sentiment_data, load_expectations_data,
+    load_unemployment_data, load_housing_data, load_vehicle_data,
+    refresh_all_api_data, get_data_status, save_csv
+)
 
 # Page configuration
 st.set_page_config(
@@ -39,68 +44,15 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# DATA
+# DATA - Load from CSV files (with fallback to defaults)
 # =============================================================================
 
-# GDP Data - Both Q2 and Q3 2025 are disputed
-gdp_data = pd.DataFrame({
-    'Quarter': ['Q1 20', 'Q2 20', 'Q3 20', 'Q4 20', 'Q1 21', 'Q2 21', 'Q3 21', 'Q4 21',
-                'Q1 22', 'Q2 22', 'Q3 22', 'Q4 22', 'Q1 23', 'Q2 23', 'Q3 23', 'Q4 23',
-                'Q1 24', 'Q2 24', 'Q3 24', 'Q4 24', 'Q1 25', 'Q2 25', 'Q3 25'],
-    'GDP': [-5.3, -28.0, 34.8, 4.0, 6.3, 7.0, 2.3, 6.9,
-            -1.6, -0.6, 3.2, 2.6, 2.2, 2.1, 4.9, 3.4,
-            1.4, 3.0, 2.8, 2.3, -0.5, 3.8, 4.3],
-    'Disputed': [None]*21 + [1.0, 0.8]  # Q2: ~0.5-1.5% (using 1.0), Q3: 0.8%
-})
-
-# Consumer Sentiment Data
-sentiment_data = pd.DataFrame({
-    'Period': ['Jan 19', 'Jul 19', 'Dec 19', 'Jan 20', 'Apr 20', 'Jul 20', 'Dec 20',
-               'Jan 21', 'Jul 21', 'Dec 21', 'Jan 22', 'Jun 22', 'Dec 22',
-               'Jan 23', 'Jul 23', 'Dec 23', 'Jan 24', 'Jul 24', 'Dec 24',
-               'Jan 25', 'Apr 25', 'Jul 25', 'Dec 25'],
-    'Michigan': [91.2, 98.4, 99.3, 99.8, 71.8, 72.5, 80.7, 79.0, 81.2, 70.6,
-                 67.2, 50.0, 59.7, 64.9, 71.6, 69.7, 79.0, 66.4, 74.0,
-                 73.2, 52.2, 61.7, 52.9],
-    'Conference Board': [121.7, 135.8, 126.5, 130.4, 85.7, 91.7, 87.1, 87.1, 125.1, 115.2,
-                         111.1, 98.7, 109.0, 106.0, 114.0, 108.0, 110.9, 101.9, 104.7,
-                         105.3, 86.0, 95.4, 89.1]
-})
-
-# Expectations Index Data
-expectations_data = pd.DataFrame({
-    'Month': ['Jan 24', 'Feb 24', 'Mar 24', 'Apr 24', 'May 24', 'Jun 24', 'Jul 24', 'Aug 24',
-              'Sep 24', 'Oct 24', 'Nov 24', 'Dec 24', 'Jan 25', 'Feb 25', 'Mar 25', 'Apr 25',
-              'May 25', 'Jun 25', 'Jul 25', 'Aug 25', 'Sep 25', 'Oct 25', 'Nov 25', 'Dec 25'],
-    'Value': [83.8, 79.8, 77.4, 68.8, 72.8, 79.0, 82.0, 82.5,
-              82.4, 89.1, 86.0, 78.1, 76.7, 72.9, 65.2, 54.4,
-              72.8, 71.5, 73.4, 75.6, 73.7, 70.7, 70.7, 70.7]
-})
-
-# Unemployment Data
-unemployment_data = pd.DataFrame({
-    'Year': ['2019', '2020', '2021', '2022', '2023', '2024', '2025'],
-    'Overall': [3.5, 8.1, 5.4, 3.6, 3.6, 4.0, 4.6],
-    'Young Grads (22-27)': [3.25, 6.5, 5.0, 3.5, 3.8, 4.2, 4.59],
-    'Recent Grads': [5.0, 9.0, 7.5, 5.5, 6.0, 7.5, 9.7]
-})
-
-# Housing Data
-housing_data = pd.DataFrame({
-    'Year': ['2019', '2020', '2021', '2022', '2023', '2024', '2025'],
-    'Median Price ($K)': [313, 329, 386, 449, 431, 420, 417],
-    'Price-to-Income Ratio': [4.1, 4.3, 4.6, 5.2, 5.1, 5.0, 5.0],
-    'Cost as % of Income': [35, 37, 40, 48, 47, 47, 47.7],
-    'First-Time Buyer Age': [33, 34, 36, 38, 39, 39, 40]
-})
-
-# Vehicle Data
-vehicle_data = pd.DataFrame({
-    'Year': ['2019', '2020', '2021', '2022', '2023', '2024', '2025'],
-    'Avg Transaction Price': [36718, 40107, 47000, 49929, 48528, 47500, 49814],
-    'Models Under $25K': [30, 25, 20, 12, 10, 10, 8],
-    'Avg Monthly Payment': [554, 575, 641, 717, 726, 734, 754]
-})
+gdp_data = load_gdp_data()
+sentiment_data = load_sentiment_data()
+expectations_data = load_expectations_data()
+unemployment_data = load_unemployment_data()
+housing_data = load_housing_data()
+vehicle_data = load_vehicle_data()
 
 # =============================================================================
 # SIDEBAR
@@ -109,9 +61,45 @@ vehicle_data = pd.DataFrame({
 st.sidebar.title("📊 Navigation")
 page = st.sidebar.radio(
     "Select Section",
-    ["Overview", "GDP Controversy", "Consumer Sentiment", "Labor Market", 
-     "Housing", "Vehicles", "K-Shape Analysis", "Investment Guidance"]
+    ["Overview", "GDP Controversy", "Consumer Sentiment", "Labor Market",
+     "Housing", "Vehicles", "K-Shape Analysis", "Investment Guidance", "Data Management"]
 )
+
+st.sidebar.markdown("---")
+
+# Data Refresh Section
+st.sidebar.markdown("### Data Refresh")
+if st.sidebar.button("🔄 Refresh from APIs", help="Refresh GDP, Unemployment, and Sentiment data from FRED API"):
+    with st.sidebar:
+        with st.spinner("Refreshing data..."):
+            # Get API keys from secrets
+            fred_key = st.secrets.get("FRED_API_KEY", None)
+            bea_key = st.secrets.get("BEA_API_KEY", None)
+
+            if fred_key:
+                results = refresh_all_api_data(fred_key, bea_key)
+
+                success_count = sum(1 for r in results.values() if r[0])
+                st.sidebar.success(f"Refreshed {success_count}/5 datasets")
+
+                # Show details in expander
+                with st.sidebar.expander("Refresh Details"):
+                    for name, (success, msg, _) in results.items():
+                        if success:
+                            st.write(f"✅ {name}: {msg}")
+                        else:
+                            st.write(f"⚠️ {name}: {msg}")
+
+                # Rerun to reload data
+                st.rerun()
+            else:
+                st.sidebar.error("API keys not configured. Add FRED_API_KEY to secrets.")
+
+# Data status
+data_status = get_data_status()
+with st.sidebar.expander("📅 Data Status"):
+    for name, info in data_status.items():
+        st.write(f"**{name}:** {info['last_updated']}")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### Data Sources")
@@ -555,10 +543,144 @@ elif page == "Investment Guidance":
     
     st.markdown("---")
     st.caption("""
-    **DISCLAIMER:** This analysis is for informational purposes only and does not constitute investment advice. 
-    All investments carry risk, including potential loss of principal. Investors should consult qualified 
+    **DISCLAIMER:** This analysis is for informational purposes only and does not constitute investment advice.
+    All investments carry risk, including potential loss of principal. Investors should consult qualified
     financial advisors before making investment decisions.
     """)
+
+# -----------------------------------------------------------------------------
+# DATA MANAGEMENT PAGE
+# -----------------------------------------------------------------------------
+elif page == "Data Management":
+    st.header("Data Management")
+    st.markdown("View, edit, and export the underlying data used in this dashboard.")
+
+    # Data status overview
+    st.subheader("Data Status")
+    status_cols = st.columns(3)
+    data_status = get_data_status()
+    for i, (name, info) in enumerate(data_status.items()):
+        with status_cols[i % 3]:
+            st.metric(
+                name,
+                f"{info['rows']} rows",
+                f"Updated: {info['last_updated']}"
+            )
+
+    st.markdown("---")
+
+    # Data viewer/editor
+    st.subheader("View & Edit Data")
+
+    data_choice = st.selectbox(
+        "Select Dataset",
+        ["GDP", "Consumer Sentiment", "Expectations Index", "Unemployment", "Housing", "Vehicles"]
+    )
+
+    # Map selection to data and filename
+    data_map = {
+        "GDP": (gdp_data, "gdp_data.csv"),
+        "Consumer Sentiment": (sentiment_data, "sentiment_data.csv"),
+        "Expectations Index": (expectations_data, "expectations_data.csv"),
+        "Unemployment": (unemployment_data, "unemployment_data.csv"),
+        "Housing": (housing_data, "housing_data.csv"),
+        "Vehicles": (vehicle_data, "vehicle_data.csv")
+    }
+
+    selected_data, filename = data_map[data_choice]
+
+    # Display editable dataframe
+    st.markdown(f"**{data_choice} Data** (`{filename}`)")
+
+    edited_df = st.data_editor(
+        selected_data,
+        use_container_width=True,
+        num_rows="dynamic",
+        key=f"editor_{data_choice}"
+    )
+
+    # Save button
+    col1, col2, col3 = st.columns([1, 1, 2])
+    with col1:
+        if st.button("💾 Save Changes", type="primary"):
+            save_csv(edited_df, filename)
+            st.success(f"Saved {filename}!")
+            st.rerun()
+
+    with col2:
+        # Download button
+        csv_data = edited_df.to_csv(index=False)
+        st.download_button(
+            "📥 Download CSV",
+            csv_data,
+            file_name=filename,
+            mime="text/csv"
+        )
+
+    st.markdown("---")
+
+    # API refresh section
+    st.subheader("API Data Sources")
+
+    st.info("""
+    **Available via FRED API:**
+    - GDP Growth Rate (quarterly)
+    - Unemployment Rate (monthly/annual)
+    - Michigan Consumer Sentiment
+
+    **Manual Update Required:**
+    - Conference Board Consumer Confidence (proprietary)
+    - Disputed GDP figures (Rosenberg Research)
+    - Graduate unemployment rates (BLS special reports)
+    - Housing data (NAR/Zillow)
+    - Vehicle data (Cox Automotive/KBB)
+    """)
+
+    # Refresh specific datasets
+    st.markdown("**Refresh Individual Datasets:**")
+
+    refresh_cols = st.columns(3)
+    with refresh_cols[0]:
+        if st.button("🔄 Refresh GDP"):
+            fred_key = st.secrets.get("FRED_API_KEY", None)
+            if fred_key:
+                from data_manager import refresh_gdp_data
+                success, msg, _ = refresh_gdp_data(fred_key)
+                if success:
+                    st.success(msg)
+                    st.rerun()
+                else:
+                    st.error(msg)
+            else:
+                st.error("FRED API key not configured")
+
+    with refresh_cols[1]:
+        if st.button("🔄 Refresh Unemployment"):
+            fred_key = st.secrets.get("FRED_API_KEY", None)
+            if fred_key:
+                from data_manager import refresh_unemployment_data
+                success, msg, _ = refresh_unemployment_data(fred_key)
+                if success:
+                    st.success(msg)
+                    st.rerun()
+                else:
+                    st.error(msg)
+            else:
+                st.error("FRED API key not configured")
+
+    with refresh_cols[2]:
+        if st.button("🔄 Refresh Sentiment"):
+            fred_key = st.secrets.get("FRED_API_KEY", None)
+            if fred_key:
+                from data_manager import refresh_sentiment_data
+                success, msg, _ = refresh_sentiment_data(fred_key)
+                if success:
+                    st.success(msg)
+                    st.rerun()
+                else:
+                    st.error(msg)
+            else:
+                st.error("FRED API key not configured")
 
 # Footer
 st.markdown("---")

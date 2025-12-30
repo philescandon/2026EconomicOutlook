@@ -46,3 +46,9 @@ Thumbs.db
 # Environment variables
 .env
 .env.local
+
+# Project specific - exclude non-app files
+*.docx
+*.jsx
+*.zip
+files/
